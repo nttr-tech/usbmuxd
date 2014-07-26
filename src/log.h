@@ -39,6 +39,6 @@ void log_enable_syslog();
 void log_disable_syslog();
 
 void usbmuxd_log(enum loglevel level, const char *fmt, ...) __attribute__ ((format (printf, 2, 3)));
-
+void usbmuxd_log_buffer(enum loglevel level, const unsigned char *data, const size_t length);
 
 #endif

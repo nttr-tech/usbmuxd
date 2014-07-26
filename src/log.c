@@ -61,6 +61,24 @@ static int level_to_syslog_level(int level)
 	return result;
 }
 
+static void usbmuxd_vlog_raw(enum loglevel level, const char *fmt, va_list ap)
+{
+	if (log_syslog) {
+		vsyslog(level_to_syslog_level(level), fmt, ap);
+	} else {
+		vfprintf(stderr, fmt, ap);
+	}
+}
+
+static void usbmuxd_log_raw(enum loglevel level, const char *fmt, ...)
+{
+	va_list ap;
+
+	va_start(ap, fmt);
+	usbmuxd_vlog_raw(level, fmt, ap);
+	va_end(ap);
+}
+
 void usbmuxd_log(enum loglevel level, const char *fmt, ...)
 {
 	va_list ap;
@@ -84,12 +102,41 @@ void usbmuxd_log(enum loglevel level, const char *fmt, ...)
 	}
 
 	va_start(ap, fmt);
-	if (log_syslog) {
-		vsyslog(level_to_syslog_level(level), fs, ap);
-	} else {
-		vfprintf(stderr, fs, ap);
-	}
+	usbmuxd_vlog_raw(level, fs, ap);
 	va_end(ap);
 
 	free(fs);
+}
+
+void usbmuxd_log_buffer(enum loglevel level, const unsigned char *data, const size_t length)
+{
+	if(level > log_level)
+		return;
+
+	size_t i;
+	int j;
+	unsigned char c;
+
+	for (i = 0; i < length; i += 16) {
+		usbmuxd_log_raw(level, "%04x: ", i);
+		for (j = 0; j < 16; j++) {
+			if (i + j >= length) {
+				usbmuxd_log_raw(level, "   ");
+				continue;
+			}
+			usbmuxd_log_raw(level, "%02x ", *(data + i + j) & 0xff);
+		}
+		usbmuxd_log_raw(level, "  | ");
+		for (j = 0; j < 16; j++) {
+			if (i + j >= length)
+				break;
+			c = *(data + i + j);
+			if ((c < 32) || (c > 127)) {
+				usbmuxd_log_raw(level, ".");
+				continue;
+			}
+			usbmuxd_log_raw(level, "%c", c);
+		}
+		usbmuxd_log_raw(level, "\n");
+	}
 }
